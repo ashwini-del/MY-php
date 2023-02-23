@@ -1,0 +1,2 @@
+ yum_repo_url: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+ php_path: "/usr/bin/php"

@@ -1,0 +1,51 @@
+
+- name: Check if PHP is installed
+  shell: dpkg -s php{{php_version}} | grep Status
+  register: result
+  changed_when: false
+  ignore_errors: yes
+- name: show if php alreday exist
+  debug:
+    msg: php{{php_version}} is Already exist
+  when: result.rc == 0
+- name: show if php not exist
+  debug: 
+    msg: php{{php_version}} is  not exist
+  when: result.rc != 0
+#installing php on Debian
+- name: "Print execution results"
+  debug:
+    msg:  php{{php_version}} Installation - started"
+  when: result.rc != 0
+
+- name: Add repository for PHP versions (Ubuntu).
+  apt_repository: repo='ppa:ondrej/php'
+  when: result.rc != 0
+
+- name: Update package list
+  shell: apt-get update
+  when: result.rc != 0
+  args:
+    warn: false
+
+- name: Install PHP
+  shell: apt-get install php{{php_version}} -y
+  when: result.rc != 0
+  args:
+    warn: false
+# check version of newly installed php
+- name: Checking php version
+  command: php --version
+  ignore_errors: yes
+  changed_when: false
+  register: new_php
+# setup PHP Info Page on Debian 
+- name: Sets Up PHP Info Page on Debian
+  template:
+    src: info.php.j2
+    dest: "/var/www/html/info.php"
+#installing php on Debian
+- name: "Print execution results"
+  debug:
+    msg:  php{{php_version}} Installation - Successful"
+  when: new_php.rc == 0

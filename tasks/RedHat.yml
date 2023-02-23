@@ -1,0 +1,114 @@
+  - name: Check PHP version
+    command: php -v
+    register: php_version_output
+    ignore_errors: true
+
+  - name: Display if php already exist
+    debug:
+      msg: "php{{php_version}} is alreday exist"
+    when: php_version_output.rc == 0
+  - name: Display if php not exist
+    debug:
+      msg: "php{{php_version}} is not exist"
+    when: php_version_output.rc != 0
+
+  # - name: Display installed PHP version
+  #   debug:
+  #     msg: "Installed PHP version is {{ php_version_output.stdout_lines[0].split(' ')[1] }}"
+  #   when: php_version_output.rc == 0
+  - name: Check if EPEL repository is installed
+    stat:
+      path: /etc/yum.repos.d/epel.repo
+    register: epel_repo
+    ignore_errors: true
+    
+  - name: Install EPEL repository
+    yum:
+      name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+      state: present
+    when: not epel_repo.stat.exists
+    ignore_errors: true
+
+  - name: Check if Remi repository is installed
+    stat:
+      path: /etc/yum.repos.d/remi.repo
+    register: remi_repo
+    ignore_errors: true
+
+  - name: Install Remi repository
+    yum:
+      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+      state: present
+    when: not remi_repo.stat.exists
+    ignore_errors: true
+
+  
+  - name: Install PHP
+    yum:
+      name:
+        - php{{php_version}}
+        # - libapache2-mod-php{{ package_version }}
+        # - php7.4-json{{ package_version }}
+        # - php7.4-xml{{ package_version }}
+         
+      state: present
+      enablerepo: remi-php{{php_version}}
+    when: php_version_output.rc != 0
+    # when: "'php' not in ansible_pkg_mgr_facts.packages"
+    # when:
+    #   - "'remi-php{{php_version}}' in ansible_yum_repo_available"
+    #   - "'php{{php_version}}' in ansible_facts.packages"
+  - name: Update PATH to use PHP.
+    lineinfile:
+      dest: ~/.bashrc
+      line: 'export PATH="/usr/bin/php{{php_version}}:$PATH"'
+      create: yes
+    register: bashrc
+  - name: Reload bashrc file
+    command: source ~/.bashrc
+    when: bashrc.changed
+    ignore_errors: true
+
+ 
+  # - name: Add PHP path to $PATH variable
+  #   lineinfile:
+  #     dest: /etc/environment
+  #     regexp: '^PATH='
+  #     line: 'PATH="{{ php_path }}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
+    # notify:
+    #   - Reload environment
+ 
+
+  - name: Create symbolic link
+    file:
+      src: /usr/bin/php{{php_version}}
+      dest: /usr/bin/php
+      state: link
+
+    ignore_errors: true
+  - name: Check PHP version
+    command: php -v
+    register: php_version_current
+    ignore_errors: yes
+
+  - name: Display installed PHP version
+    debug:
+      msg: "Installed PHP version is {{ php_version_current.stdout_lines[0].split(' ')[1] }}"
+    when: php_version_current.rc == 0
+  # - name: Sets Up PHP Info Page on Debian
+  #   file:
+  #     src: test.php
+  #     dest: "/var/www/html/test.php"
+  - name: Create test.php file
+    copy:
+      dest: /var/www/html/test.php
+      content: "<?php\nphpinfo();\n?>"
+      # mode: '0644'
+  - name: Update Apache configuration
+    lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: "^#LoadModule php_module modules/libphp.so"
+      line: "LoadModule php_module modules/libphp.so"
+      state: present
+      backup: yes
+      insertafter: "^#LoadModule dir_module modules/mod_dir.so"

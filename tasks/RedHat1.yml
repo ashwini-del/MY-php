@@ -1,0 +1,44 @@
+  - name: Check if Remi repository is already present
+    shell: yum repolist | grep remi
+    register: remi_repo
+    ignore_errors: yes
+
+  - name: Add Remi repository
+    yum_repository:
+      name: remi
+      description: Remi's RPM repository
+      baseurl: http://rpms.remirepo.net/enterprise/{{ ansible_distribution_major_version }}/php{{ php_version }}/$basearch/
+      gpgcheck: yes
+      gpgkey: http://rpms.remirepo.net/RPM-GPG-KEY-remi
+    when: remi_repo.rc != 0
+
+  - name: Check if Remi repository is enabled
+    shell: yum repolist enabled | grep remi
+    register: remi_repo
+
+  - name: Enable Remi repository
+    shell: yum-config-manager --enable remi-php80
+    when: remi_repo.rc != 0
+
+  - name: Install PHP
+    shell: yum install -y php
+    # vars:
+    #   php_version: "{{ user_php_version }}"
+    # when: "'php{{ php_version }}' not in remi_repo.stdout"
+
+  - name: Install required PHP packages
+    shell: yum install -y {{ item }}
+    with_items:
+      - php-cli
+      - php-fpm
+      - php-mysql
+      - php-json
+    when: "'php{{ php_version }}' in remi_repo.stdout"
+
+  - name: Start and enable PHP-FPM service
+    service:
+      name: php-fpm
+      state: started
+      enabled: yes
+    when: "'php{{ php_version }}' in remi_repo.stdout"
+    # https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/
